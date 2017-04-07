@@ -17,8 +17,16 @@ namespace DigikeyParser {
 
             parser.UpdateInfo();
 
+            // Столбцы
+            Console.WriteLine("==================================");
+            foreach (var column in parser.columns) {
+                Console.WriteLine(column);
+            }
+            Console.WriteLine("==================================");
 
-            foreach(var row in parser.table) {
+
+            // Выводим весь список
+            foreach (var row in parser.table) {
                 foreach (var cell in row) {
                     Console.WriteLine(cell.Key + ": " + cell.Value);
                 }

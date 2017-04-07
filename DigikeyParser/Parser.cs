@@ -10,7 +10,7 @@ namespace DigikeyParser {
     class Parser {
         public string pageUrl { get; set; }
 
-        public List<Dictionary<string, string>> table { get; private set; }
+        public List<Dictionary<string, string>> table { get; private set; } // table[3]["Digi-Key Part Number"]
         public List<string> columns { get; private set; }
 
         public string proxy { get; set; } = "";
@@ -84,10 +84,19 @@ namespace DigikeyParser {
 
 
 
+        // Получение прямой ссылки на PDF без редиректов
+        private string GetPdfUrlFromDigikey(string url) {
+            return url; // TODO: Мне щас так лень это делать
+        }
+
+
+
+
         // Обновить таблицу результатов с digikey
         public void UpdateInfo() {
             Console.WriteLine("Load " + pageUrl);
 
+            int i = 0;
             columns = new List<string>();
             table = new List<Dictionary<string, string>>();
 
@@ -100,21 +109,48 @@ namespace DigikeyParser {
             // Получаем список всех названий столбцов и записываем в tblheadArray
             var tblhead = doc.GetElementbyId("tblhead");
             var tblheadRow = tblhead.SelectNodes("tr")[0];
+            i = 0;
             foreach (HtmlNode cell in tblheadRow.SelectNodes("th|td")) {
-                columns.Add(SuperTrim(cell.InnerText));
+                switch (i) {
+                    case 0: break;  // Compare Parts нам нахер не нужен
+
+                    case 1: // Во втором столбце у нас иконка PDF, надо заменить на текст
+                        columns.Add("PDF"); 
+                    break;
+
+                    default:
+                        columns.Add(SuperTrim(cell.InnerText));
+                    break;
+                }
+                i++;
             }
 
 
-            // парсим саму информацию          
+            // Парсим саму информацию          
             var lnkPart = doc.GetElementbyId("lnkPart");
             foreach (HtmlNode row in lnkPart.SelectNodes("tr")) {
 
-                // В table каждый элемент массива является cell
-                // table[3]["Digi-Key Part Number"]
-                int i = 0;
-                Dictionary<string, string> rowInfo = new Dictionary<string, string>();
+                i = -1; // Ибо мы удалили Compare Parts из columns
+                var rowInfo = new Dictionary<string, string>();
                 foreach (HtmlNode cell in row.SelectNodes("th|td")) {
-                    rowInfo[columns[i++]] = SuperTrim(cell.InnerText);
+                    switch (i) {
+                        case -1: break; // Compare Parts нам все ещё нахер не нужен
+
+                        case 0: // PDF надо вытаскивать по другому
+                            string pdfUrl = cell.SelectSingleNode("a").Attributes["href"].Value;  
+                            rowInfo[columns[i]] = GetPdfUrlFromDigikey(pdfUrl); 
+                        break;
+
+                        case 1: // Получаем ссылку на картинку компонента
+                            string imgUrl = cell.SelectSingleNode("a/img").Attributes["zoomimg"].Value;
+                            rowInfo[columns[i]] = imgUrl;
+                        break;
+
+                        default:
+                            rowInfo[columns[i]] = SuperTrim(cell.InnerText);
+                        break;
+                    }
+                    i++;
                 }
 
                 // Добавляем один row в таблицу
