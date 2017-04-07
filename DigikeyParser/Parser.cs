@@ -11,6 +11,7 @@ namespace DigikeyParser {
         public string pageUrl { get; set; }
 
         public List<Dictionary<string, string>> table { get; private set; }
+        public List<string> columns { get; private set; }
 
         public string proxy { get; set; } = "";
         public string userAgent { get; set; } = "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko";
@@ -87,7 +88,7 @@ namespace DigikeyParser {
         public void UpdateInfo() {
             Console.WriteLine("Load " + pageUrl);
 
-            List<string> tblheadArray = new List<string>();
+            columns = new List<string>();
             table = new List<Dictionary<string, string>>();
 
 
@@ -99,8 +100,8 @@ namespace DigikeyParser {
             // Получаем список всех названий столбцов и записываем в tblheadArray
             var tblhead = doc.GetElementbyId("tblhead");
             var tblheadRow = tblhead.SelectNodes("tr")[0];
-            foreach (HtmlNode cell in tblheadRow.SelectNodes("th|td")) {    
-                tblheadArray.Add(SuperTrim(cell.InnerText));
+            foreach (HtmlNode cell in tblheadRow.SelectNodes("th|td")) {
+                columns.Add(SuperTrim(cell.InnerText));
             }
 
 
@@ -113,7 +114,7 @@ namespace DigikeyParser {
                 int i = 0;
                 Dictionary<string, string> rowInfo = new Dictionary<string, string>();
                 foreach (HtmlNode cell in row.SelectNodes("th|td")) {
-                    rowInfo[tblheadArray[i++]] = SuperTrim(cell.InnerText);
+                    rowInfo[columns[i++]] = SuperTrim(cell.InnerText);
                 }
 
                 // Добавляем один row в таблицу
