@@ -85,7 +85,7 @@ namespace DigikeyParser {
 
 
         // Получение прямой ссылки на PDF без редиректов
-        private string GetPdfUrlFromDigikey(string url) {
+        private string RemoveUrlRedirect(string url) {
             return url; // TODO: Мне щас так лень это делать
         }
 
@@ -138,7 +138,7 @@ namespace DigikeyParser {
 
                         case 0: // PDF надо вытаскивать по другому
                             string pdfUrl = cell.SelectSingleNode("a").Attributes["href"].Value;  
-                            rowInfo[columns[i]] = GetPdfUrlFromDigikey(pdfUrl); 
+                            rowInfo[columns[i]] = RemoveUrlRedirect(pdfUrl); 
                         break;
 
                         case 1: // Получаем ссылку на картинку компонента
