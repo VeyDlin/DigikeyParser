@@ -6,7 +6,20 @@ using System.Text;
 
 
 namespace DigikeyParser {
+
     class DigikeyParser {
+
+        // Поддержка GZip у WebClient
+        private class GZipWebClient : WebClient {
+            protected override WebRequest GetWebRequest(Uri address) {
+                var request = (HttpWebRequest)base.GetWebRequest(address);
+                request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                return request;
+            }
+        }
+
+
+
 
         // Страница со списком 
         // Например: Product Index > Integrated Circuits (ICs) > Data Acquisition - Digital to Analog Converters (DAC)
@@ -21,7 +34,8 @@ namespace DigikeyParser {
         // Инициализация
         public DigikeyParser() {
             ServicePointManager.Expect100Continue = true;
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
         }
 
 
@@ -29,7 +43,7 @@ namespace DigikeyParser {
 
         // Сделать GET запрос
         private string GetHtmlCode(string url) {
-            using(var webClient = new WebClient()) {
+            using(var webClient = new GZipWebClient()) {
                 webClient.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
                 webClient.Encoding = Encoding.UTF8;
  
