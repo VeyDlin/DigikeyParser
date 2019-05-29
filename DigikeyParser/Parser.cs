@@ -1,76 +1,61 @@
 ﻿using System;
 using HtmlAgilityPack;
-using SeasideResearch.LibCurlNet;
-using System.IO;
 using System.Collections.Generic;
-
+using System.Net;
+using System.Text;
 
 
 namespace DigikeyParser {
-    class Parser {
-        public string pageUrl { get; set; }
+    class DigikeyParser {
 
-        public List<Dictionary<string, string>> table { get; private set; } // table[3]["Digi-Key Part Number"]
-        public List<string> columns { get; private set; }
+        // Страница со списком 
+        // Например: Product Index > Integrated Circuits (ICs) > Data Acquisition - Digital to Analog Converters (DAC)
+        public struct CategoryResult {
+            public List<Dictionary<string, string>> table; // table[3]["Digi-Key Part Number"]
+            public List<string> columns;
+        };
 
-        public string proxy { get; set; } = "";
-        public string userAgent { get; set; } = "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko";
-        public string cookieFile { get; set; } = "";
 
-        private Easy easy;
-        private string SockBuff;
 
 
         // Инициализация
-        public Parser() {
-            Curl.GlobalInit((int)CURLinitFlag.CURL_GLOBAL_ALL);
-        }
-
-
-
-
-        // Удаляем куки (файл хранящий их)
-        public void ClearCookies() {
-            if (File.Exists(cookieFile)) {
-                File.Delete(cookieFile);
-            }
+        public DigikeyParser() {
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
         }
 
 
 
 
         // Сделать GET запрос
-        private string Get(string url) {
-            SockBuff = "";
-            easy = new Easy();
+        private string GetHtmlCode(string url) {
+            using(var webClient = new WebClient()) {
+                webClient.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
+                webClient.Encoding = Encoding.UTF8;
+ 
+                webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12");
+                webClient.Headers.Add("Accept", "*/*");
+                webClient.Headers.Add("Accept-Language", "en-gb,en;q=0.5");
+                webClient.Headers.Add("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7");
 
-            Easy.WriteFunction wf = new Easy.WriteFunction(delegate (Byte[] buf, Int32 size, Int32 nmemb, Object extraData) {
-                SockBuff = SockBuff + System.Text.Encoding.UTF8.GetString(buf);
-                return size * nmemb;
-            });
-            easy.SetOpt(CURLoption.CURLOPT_URL, url);
-            easy.SetOpt(CURLoption.CURLOPT_TIMEOUT, "60");
-            easy.SetOpt(CURLoption.CURLOPT_WRITEFUNCTION, wf);
-            easy.SetOpt(CURLoption.CURLOPT_USERAGENT, userAgent);
-            easy.SetOpt(CURLoption.CURLOPT_COOKIEFILE, cookieFile);
-            easy.SetOpt(CURLoption.CURLOPT_COOKIEJAR, cookieFile);
-            easy.SetOpt(CURLoption.CURLOPT_FOLLOWLOCATION, true);
+                var htmlData = webClient.DownloadData(url);
+                var htmlCode = Encoding.UTF8.GetString(htmlData);
 
-            if (url.Contains("https")) {
-                easy.SetOpt(CURLoption.CURLOPT_SSL_VERIFYHOST, 1);
-                easy.SetOpt(CURLoption.CURLOPT_SSL_VERIFYPEER, 0);
+                return htmlCode;
             }
-
-            if (proxy != "") {
-                easy.SetOpt(CURLoption.CURLOPT_PROXY, proxy);
-                easy.SetOpt(CURLoption.CURLOPT_PROXYTYPE, CURLproxyType.CURLPROXY_HTTP);
-            }
-
-            easy.Perform();
-            easy.Dispose();
-
-            return SockBuff;
         }
+
+
+
+
+
+        // Получить HtmlDocument по ссылке
+        private HtmlDocument GetHtmlDocument(string url) {
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(GetHtmlCode(url));
+            return htmlDocument;
+        }
+
 
 
 
@@ -84,80 +69,83 @@ namespace DigikeyParser {
 
 
 
+
         // Получение прямой ссылки на PDF без редиректов
         private string RemoveUrlRedirect(string url) {
-            return url; // TODO: Мне щас так лень это делать
+            var uri = new Uri(url);
+
+            if(uri.Host == "www.digikey.com" || uri.Host == "digikey.com") {
+                var myWebRequest = WebRequest.Create(url);
+                WebResponse myWebResponse = myWebRequest.GetResponse();
+
+                string outUrl = uri.Equals(myWebResponse.ResponseUri) ? url : myWebResponse.ResponseUri.ToString();
+
+                myWebResponse.Close();
+
+                return outUrl;
+            } else {
+                return url;
+            }
         }
 
 
 
 
         // Обновить таблицу результатов с digikey
-        public void UpdateInfo() {
-            Console.WriteLine("Load " + pageUrl);
-
-            int i = 0;
-            columns = new List<string>();
-            table = new List<Dictionary<string, string>>();
+        public CategoryResult GetCategory(string url) {
+            var outList = new CategoryResult();
+            outList.columns = new List<string>();
+            outList.table = new List<Dictionary<string, string>>();
 
 
             // Загружаем страницу
-            var doc = new HtmlDocument();
-            doc.LoadHtml(Get(pageUrl));
+            var htmlDocument = GetHtmlDocument(url);
 
-
-            // Получаем список всех названий столбцов и записываем в tblheadArray
-            var tblhead = doc.GetElementbyId("tblhead");
-            var tblheadRow = tblhead.SelectNodes("tr")[0];
-            i = 0;
+            // Получаем список всех названий столбцов
+            var tblheadRow = htmlDocument.GetElementbyId("tblhead").SelectNodes("tr")[0];
+            int i = 0;
             foreach (HtmlNode cell in tblheadRow.SelectNodes("th|td")) {
-                switch (i) {
-                    case 0: break;  // Compare Parts нам нахер не нужен
-
-                    case 1: // Во втором столбце у нас иконка PDF, надо заменить на текст
-                        columns.Add("PDF"); 
-                    break;
-
-                    default:
-                        columns.Add(SuperTrim(cell.InnerText));
-                    break;
-                }
+                outList.columns.Add(i == 1 ? "PDF" : SuperTrim(cell.InnerText));
                 i++;
             }
 
 
-            // Парсим саму информацию          
-            var lnkPart = doc.GetElementbyId("lnkPart");
+            // Парсим саму информацию       
+           
+            var lnkPart = htmlDocument.GetElementbyId("lnkPart");
             foreach (HtmlNode row in lnkPart.SelectNodes("tr")) {
-
-                i = -1; // Ибо мы удалили Compare Parts из columns
+                int index = 0;
                 var rowInfo = new Dictionary<string, string>();
                 foreach (HtmlNode cell in row.SelectNodes("th|td")) {
-                    switch (i) {
-                        case -1: break; // Compare Parts нам все ещё нахер не нужен
-
-                        case 0: // PDF надо вытаскивать по другому
+                    switch (index) {
+                        case 1: // PDF надо вытаскивать по другому
                             string pdfUrl = cell.SelectSingleNode("a").Attributes["href"].Value;  
-                            rowInfo[columns[i]] = RemoveUrlRedirect(pdfUrl); 
+                            rowInfo[outList.columns[index]] = RemoveUrlRedirect(pdfUrl); 
                         break;
 
-                        case 1: // Получаем ссылку на картинку компонента
+                        case 2: // Получаем ссылку на картинку компонента
                             string imgUrl = cell.SelectSingleNode("a/img").Attributes["zoomimg"].Value;
-                            rowInfo[columns[i]] = imgUrl;
+                            rowInfo[outList.columns[index]] = imgUrl;
                         break;
 
                         default:
-                            rowInfo[columns[i]] = SuperTrim(cell.InnerText);
+                            rowInfo[outList.columns[index]] = SuperTrim(cell.InnerText);
                         break;
                     }
-                    i++;
+                    index++;
                 }
 
                 // Добавляем один row в таблицу
-                table.Add(rowInfo);
+                outList.table.Add(rowInfo);
             }
 
+            return outList;
         }
+
+
+
+
+
 
     }
 }

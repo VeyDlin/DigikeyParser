@@ -6,27 +6,18 @@ using System.Threading.Tasks;
 
 
 
-
 namespace DigikeyParser {
     class Program {
+
         static void Main(string[] args) {
 
-            Parser parser = new Parser() {
-                pageUrl = "https://www.digikey.com/products/en/integrated-circuits-ics/data-acquisition-digital-to-analog-converters-dac/701"
-            };
 
-            parser.UpdateInfo();
-
-            // Столбцы
-            Console.WriteLine("==================================");
-            foreach (var column in parser.columns) {
-                Console.WriteLine(column);
-            }
-            Console.WriteLine("==================================");
-
+            Console.WriteLine("GetCategory();");
+            var parser = new DigikeyParser();
+            var categoryList = parser.GetCategory("https://www.digikey.com/products/en/integrated-circuits-ics/audio-special-purpose/741");
 
             // Выводим весь список
-            foreach (var row in parser.table) {
+            foreach (var row in categoryList.table) {
                 foreach (var cell in row) {
                     Console.WriteLine(cell.Key + ": " + cell.Value);
                 }
