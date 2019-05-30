@@ -23,7 +23,7 @@ namespace DigikeyParser {
 
         // Страница со списком 
         // Например: Product Index > Integrated Circuits (ICs) > Data Acquisition - Digital to Analog Converters (DAC)
-        public struct CategoryResult {
+        public struct ProductsListResult {
             public List<Dictionary<string, string>> table; // table[3]["Digi-Key Part Number"]
             public List<string> columns;
         };
@@ -35,8 +35,8 @@ namespace DigikeyParser {
         public DigikeyParser() {
             ServicePointManager.Expect100Continue = true;
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-
         }
+
 
 
 
@@ -46,11 +46,11 @@ namespace DigikeyParser {
             using(var webClient = new GZipWebClient()) {
                 webClient.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
                 webClient.Encoding = Encoding.UTF8;
- 
+
                 webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12");
                 webClient.Headers.Add("Accept", "*/*");
-                webClient.Headers.Add("Accept-Language", "en-gb,en;q=0.5");
-                webClient.Headers.Add("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7");
+                webClient.Headers.Add("Accept-Language", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3");
+                webClient.Headers.Add("Accept-Encoding", "gzip, deflate");
 
                 var htmlData = webClient.DownloadData(url);
                 var htmlCode = Encoding.UTF8.GetString(htmlData);
@@ -59,7 +59,7 @@ namespace DigikeyParser {
             }
         }
 
-
+ 
 
 
 
@@ -89,7 +89,14 @@ namespace DigikeyParser {
             var uri = new Uri(url);
 
             if(uri.Host == "www.digikey.com" || uri.Host == "digikey.com") {
-                var myWebRequest = WebRequest.Create(url);
+                var myWebRequest = (HttpWebRequest)WebRequest.Create(url);
+                myWebRequest.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+
+                myWebRequest.Headers.Add("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12");
+                myWebRequest.Headers.Add("Accept", "*/*");
+                myWebRequest.Headers.Add("Accept-Language", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3");
+                myWebRequest.Headers.Add("Accept-Encoding", "gzip, deflate");
+
                 WebResponse myWebResponse = myWebRequest.GetResponse();
 
                 string outUrl = uri.Equals(myWebResponse.ResponseUri) ? url : myWebResponse.ResponseUri.ToString();
@@ -106,8 +113,8 @@ namespace DigikeyParser {
 
 
         // Обновить таблицу результатов с digikey
-        public CategoryResult GetCategory(string url) {
-            var outList = new CategoryResult();
+        public ProductsListResult GetProductsList(string url) {
+            var outList = new ProductsListResult();
             outList.columns = new List<string>();
             outList.table = new List<Dictionary<string, string>>();
 
@@ -131,13 +138,13 @@ namespace DigikeyParser {
                 int index = 0;
                 var rowInfo = new Dictionary<string, string>();
                 foreach (HtmlNode cell in row.SelectNodes("th|td")) {
-                    switch (index) {
-                        case 1: // PDF надо вытаскивать по другому
+                    switch (outList.columns[index]) {
+                        case "PDF": // PDF надо вытаскивать по другому
                             string pdfUrl = cell.SelectSingleNode("a").Attributes["href"].Value;  
                             rowInfo[outList.columns[index]] = RemoveUrlRedirect(pdfUrl); 
                         break;
 
-                        case 2: // Получаем ссылку на картинку компонента
+                        case "Image": // Получаем ссылку на картинку компонента
                             string imgUrl = cell.SelectSingleNode("a/img").Attributes["zoomimg"].Value;
                             rowInfo[outList.columns[index]] = imgUrl;
                         break;
