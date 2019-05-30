@@ -9,14 +9,25 @@ namespace DigikeyParser {
 
     class DigikeyParser {
 
-        // Поддержка GZip у WebClient
-        private class GZipWebClient : WebClient {
+        class ParserWebClient : WebClient {
+            public CookieContainer Cookies { get; set; }
+
+            public ParserWebClient() {
+                Cookies = new CookieContainer();
+            }
+
             protected override WebRequest GetWebRequest(Uri address) {
                 var request = (HttpWebRequest)base.GetWebRequest(address);
                 request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                request.CookieContainer = Cookies;
                 return request;
             }
+            protected override void Dispose(bool disposing) {
+                Cookies = null;
+                base.Dispose(disposing);
+            }
         }
+
 
 
 
@@ -28,38 +39,40 @@ namespace DigikeyParser {
             public List<string> columns;
         };
 
+        // Сесcия web клинта
+        private ParserWebClient webClient;
+
+
 
 
 
         // Инициализация
         public DigikeyParser() {
+            webClient = new ParserWebClient();
+            webClient.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
+            webClient.Encoding = Encoding.UTF8;
+            webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12");
+            webClient.Headers.Add("Accept", "*/*");
+            webClient.Headers.Add("Accept-Language", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3");
+            webClient.Headers.Add("Accept-Encoding", "gzip, deflate");
+
             ServicePointManager.Expect100Continue = true;
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
         }
 
-
+        ~DigikeyParser() {
+            webClient.Dispose();
+        }
 
 
 
         // Сделать GET запрос
         private string GetHtmlCode(string url) {
-            using(var webClient = new GZipWebClient()) {
-                webClient.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
-                webClient.Encoding = Encoding.UTF8;
-
-                webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12");
-                webClient.Headers.Add("Accept", "*/*");
-                webClient.Headers.Add("Accept-Language", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3");
-                webClient.Headers.Add("Accept-Encoding", "gzip, deflate");
-
-                var htmlData = webClient.DownloadData(url);
-                var htmlCode = Encoding.UTF8.GetString(htmlData);
-
-                return htmlCode;
-            }
+            var htmlData = webClient.DownloadData(url);
+            return Encoding.UTF8.GetString(htmlData);
         }
 
- 
+
 
 
 
