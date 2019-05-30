@@ -9,12 +9,26 @@ using System.Threading.Tasks;
 namespace DigikeyParser {
     class Program {
 
+
+        static private DigikeyParser.ProductsListResult ClearDigiKeyInfo(DigikeyParser.ProductsListResult list) {
+            list = DigikeyParser.DeleteColumn(list, "Digi-Key Part Number");
+            list = DigikeyParser.DeleteColumn(list, "Quantity Available");
+            list = DigikeyParser.DeleteColumn(list, "Unit Price USD");
+            list = DigikeyParser.DeleteColumn(list, "Minimum Quantity");
+            list = DigikeyParser.DeleteColumn(list, "Series");
+            list = DigikeyParser.DeleteColumn(list, "Part Status");
+            list = DigikeyParser.DeleteColumn(list, "Supplier Device Package");
+            return list;
+        }
+
+
         static void Main(string[] args) {
 
 
-            Console.WriteLine("GetCategory();");
+            Console.WriteLine("GetProductsList();");
             var parser = new DigikeyParser();
-            var categoryList = parser.GetCategory("https://www.digikey.com/products/en/integrated-circuits-ics/audio-special-purpose/741");
+            var categoryList = parser.GetProductsList("https://www.digikey.com/products/en/integrated-circuits-ics/audio-special-purpose/741");
+            categoryList = ClearDigiKeyInfo(categoryList);
 
             // Выводим весь список
             foreach (var row in categoryList.table) {

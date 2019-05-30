@@ -160,9 +160,20 @@ namespace DigikeyParser {
                 outList.table.Add(rowInfo);
             }
 
+            outList = DeleteColumn(outList, "Compare Parts");
             return outList;
         }
 
+
+
+
+
+        static public ProductsListResult DeleteColumn(ProductsListResult list, string columnNname) {
+            foreach(var row in list.table) {
+                row.Remove(columnNname);
+            }
+            return list;
+        }
 
 
 
